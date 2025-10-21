@@ -1,7 +1,13 @@
-from carddweeb_cards_by_type import carddweeb_cards_by_type
+import json
 
-deck = carddweeb_cards_by_type
+with open('carddweeb_cards_by_type.json', 'r', encoding='utf-8') as f:
+    cards_data = json.load(f)
 
+
+creatues = cards_data.get('Creature', [])
+spells = cards_data.get('Spell', [])
+heroes = cards_data.get('Hero', [])
+buildings = cards_data.get('Building', [])
 
 class Menu():
     pass
@@ -10,12 +16,22 @@ class Menu():
 class Card():
     def __init__(self, name, landscape, ability, cost):
         self.name = name 
-        self.description = description
         self.landscape = landscape
         self.ability = ability
         self.cost = cost
 
 
+creature_objects = []
+for creature_data in creatures:
+    creature = Creature(
+        name=creature_data['name'],
+        landscape=creature_data['landscape'],
+        ability=creature_data['ability'],
+        cost=creature_data['cost'],
+        attack=creature_data['attack'],
+        defense=creature_data['defense']
+        )
+    creature_objects.append(creature)
 
 class Creature(Card):
     def __init__(self, attack, defense):
