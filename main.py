@@ -109,8 +109,19 @@ landscape_deck = {
     'Landscapes': landscape_objects
     }
 
-playing_deck = copy.deepcopy(card_deck)
+building_deck = {
+    'Buildings': buildings_objects,
+    }
+
+creatures_deck = {
+    'Creatures' : creature_objects
+    }
+
+master_deck = copy.deepcopy(card_deck)
 landscape_playing_deck = copy.deepcopy(landscape_deck)
+building_playing_deck = copy.deepcopy(building_deck)
+creatures_playing_deck = copy.deepcopy(creatures_deck)
+
 drawn_cards = []
 
 def draw_random_card(deck):
@@ -128,10 +139,13 @@ def draw_random_card(deck):
 
 
 class Player():
-    def __init__(self, name, deck=playing_deck):
+    def __init__(self, name, deck=master_deck):
         self.name = name
         self.action = 2
         self.health = 25
+        self.pick_hand = []
+        self.deck = deck
+        self.idle_hand = []
         self.hand = []
         self.get_landscape_hand = []
 
@@ -150,6 +164,22 @@ class Player():
         print(f"{self.name} loses {amount} health. Remaining health: {self.health}")
         if self.health <= 0:
             print(f"{self.name} has been defeated!")
+
+
+    def starting_landscape_cards(self, deck, num_cards=4):
+        print(f"\n{self.name} Drawing {num_cards} starting landscape cards...")
+        for _ in range(num_cards):
+            landscape_list = deck['Landscapes']
+            card = random.choice(landscape_list)
+            landscape_list.remove(card)
+            temp = card.name.split(' ')[3:]
+            temp_join = ' '.join(temp)
+            card.name = temp_join
+            if card:
+                self.get_landscape_hand.append(card)
+            else:
+                print("No more landscape cards to draw.")
+                break
 
     def starting_cards(self, deck, num_cards=5):
         print(f"\n{self.name} Drawing {num_cards} starting cards...")
@@ -219,6 +249,7 @@ class Player():
                 print("No more landscape cards to draw.")
 
 
+
 class Game:
     def __init__(self):
         self.game_state = "MENU"
@@ -229,10 +260,12 @@ class Game:
         while True:
             if self.game_state == "MENU":
                 self.main_menu.handle_input()
-                self.main_menu.draw()
+                #self.main_menu.draw()
             elif self.game_state == "PLAYING":
                 self.update_game_state()
                 self.draw_game_world()
+            
+
 
 class Menu:
     def __init__(self, options):
@@ -240,7 +273,13 @@ class Menu:
 
     def handle_input(self):
         # Handle key presses to navigate and select options
-        selected_option = self.get_user_input()
+        user_input = input("Select an option (Play/Quit): ").strip()
+        selected_option = user_input
+       
+        confirmation = input().strip().upper()
+        if confirmation != 'Y':
+            return  # Return to menu without changing state
+        
         if selected_option == "Play":
             # Tell the Game class to change its state
             # This can be done by returning a value or calling a method
@@ -252,13 +291,60 @@ class Menu:
         # Logic for drawing text and buttons on the screen
         pass
 
+
+def starting_structure_cards(player, deck, num_cards=6, ):
+        print(f"\n{player.name} Drawing {num_cards} starting building cards...")
+        for _ in range(num_cards):
+            card_type, card = draw_random_card(deck)
+            if card:
+                player.pick_hand.append(card)
+            else:
+                print("No more cards to draw.")
+                break
+
+        print(f"\n{player.name}, you drew the following building cards:")
+        for i, card in enumerate(player.pick_hand, start=1):
+            print(f"{i}. {card.name}")
+            
+        while len(player.idle_hand) < 4:
+            try:
+                choice = int(input(f"Choose a card to keep (1-{len(player.pick_hand)}): ")) - 1
+                if 1 <= choice < len(player.pick_hand):
+                    input = player.pick_hand[choice]
+                    selected_card = player.pick_hand.pop(choice - 1)
+                    player.idle_hand.append(selected_card)
+                    print(f"Added '{selected_card.name}' to your idle hand.")
+                else:
+                    print("Invalid number. Please choose a valid card index.")
+            except ValueError:
+                print("Please enter a valid number.")
+
+        print(f"\n{player.name} kept the following building cards:")
+        for card in player.idle_hand:
+            print(f"- {card.name}")
+
+
+for creature in creatures_playing_deck['Creatures']:
+    temp = creature.name.split(' ')[3:]
+    temp_join = ' '.join(temp)
+    creature.name = temp_join
+    creature.ability = eval(creature.name.lower().replace(" ", "_") + "_ability()")
+    print(creature.ability)
+
 def main():
 
     Finn = Player("Finn")
     Jake = Player("Jake")
 
-    Finn.starting_cards(playing_deck, 5)
-    Jake.starting_cards(playing_deck, 5)
+
+    #Finn.starting_landscape_cards(landscape_playing_deck, 4)
+    #Finn.get_landscape(landscape_playing_deck, 4)
+
+
+
+    #Finn.starting_cards(playing_deck, 5)
+    #Jake.starting_cards(playing_deck, 5)
+
 
     #print(Finn.cards_in_hand())
     #print(Finn.pull_card(playing_deck))
