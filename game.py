@@ -59,7 +59,7 @@ class Hero(Card):
 
 # Visual Card class for rendering
 class VisualCard:
-    def __init__(self, card_data, x, y, width=100, height=140):
+    def __init__(self, card_data, x, y, width=70, height=100):
         self.card = card_data  # The actual card object (Creature, Spell, etc.)
         self.rect = pygame.Rect(x, y, width, height)
         self.dragging = False
@@ -287,173 +287,135 @@ class Lane:
 
 class Board:
     def __init__(self):
-        # Screen layout: 30% opponent lanes, 40% visual map, 30% player lanes
-        screen_play_area = SCREEN_HEIGHT - 300  # Leave more room for title and hand
-        
-        opponent_lane_height = int(screen_play_area * 0.15)
-        visual_map_height = int(screen_play_area * 0.40)
-        player_lane_height = int(screen_play_area * 0.15)
-        
-        # Board dimensions - smaller overall
-        board_width = SCREEN_WIDTH - 600
+        # Smaller play area so it fits on screen
+        screen_play_area = SCREEN_HEIGHT - 480  # reduced from -300
+
+        # Adjusted proportions
+        opponent_lane_height = int(screen_play_area * 0.20)
+        visual_map_height = int(screen_play_area * 0.35)
+        player_lane_height = int(screen_play_area * 0.20)
+
+        # Board position and size
+        board_width = SCREEN_WIDTH - 400
         board_x = 200
-        board_y = 80
-        
-        # Lane dimensions - 4 lanes in a horizontal row
-        lane_spacing = 10
-        lane_width = (board_width - 5 * lane_spacing) // 4
-        
-        # Colors for the 4 lanes
+        board_y = 275
+
+        lane_spacing = 20
+        lane_width = (board_width - 15 * lane_spacing) // 6
+
+        # Colors for lanes
         lane_colors = [GRASS_GREEN, SAND_YELLOW, BLUE_PLAINS, CORN_FIELD]
-        
+
         self.opponent_lanes = []
         self.player_lanes = []
-        
-        # Create opponent lanes (top - 30% of play area)
+
+        # Create opponent lanes
         for i in range(4):
-            x = board_x + lane_spacing + (lane_width + lane_spacing) * i
-            y = board_y
+            x = board_x + lane_spacing + (lane_width + lane_spacing) * i + 250
+            y = board_y - 50
             lane = Lane(x, y, lane_width, opponent_lane_height, lane_colors[i], i + 1)
             self.opponent_lanes.append(lane)
-        
-        # Visual map area (middle - 40% of play area)
+
+        # Visual map (battle zone)
         self.visual_map_rect = pygame.Rect(
-            board_x,
-            board_y + opponent_lane_height + 20,
-            board_width,
-            visual_map_height - 40
+            board_x + 150,
+            board_y + opponent_lane_height + 15,
+            board_width - 300,
+            visual_map_height - 30
         )
-        
-        # Create player lanes (bottom - 30% of play area)
+
+        # Create player lanes (below battle zone)
         for i in range(4):
-            x = board_x + lane_spacing + (lane_width + lane_spacing) * i
-            y = board_y + opponent_lane_height + visual_map_height
+            x = board_x + lane_spacing + (lane_width + lane_spacing) * i + 250
+            y = board_y + opponent_lane_height + visual_map_height + 10
             lane = Lane(x, y, lane_width, player_lane_height, lane_colors[i], i + 1)
             self.player_lanes.append(lane)
-    
+
     def draw(self, screen, font, small_font):
-        # Draw opponent lanes label
+        # Opponent label
         opponent_label = font.render("OPPONENT", True, WHITE)
-        screen.blit(opponent_label, (210, self.opponent_lanes[0].rect.y - 25))
-        
-        # Draw all opponent lanes
+        screen.blit(opponent_label, (120, self.opponent_lanes[0].rect.y - 25))
+
+        # Draw opponent lanes
         for lane in self.opponent_lanes:
             lane.draw(screen, font, small_font)
-        
-        # Draw visual map area (center battle zone)
+
+        # Battle zone
         pygame.draw.rect(screen, (40, 40, 40), self.visual_map_rect)
         pygame.draw.rect(screen, (100, 100, 100), self.visual_map_rect, 4)
-        
-        # Visual map label
         map_label = font.render("BATTLE ZONE", True, WHITE)
-        screen.blit(map_label, (self.visual_map_rect.centerx - 60, self.visual_map_rect.y + 10))
-        
-        # Draw visual map sprites
+        screen.blit(map_label, (self.visual_map_rect.centerx - 70, self.visual_map_rect.y + 5))
+
+        # Draw map content
         self.draw_visual_map(screen, font, small_font)
-        
-        # Draw player lanes label
+
+        # Player label
         player_label = font.render("PLAYER", True, WHITE)
-        screen.blit(player_label, (210, self.player_lanes[0].rect.y - 25))
-        
-        # Draw all player lanes
+        screen.blit(player_label, (120, self.player_lanes[0].rect.y - 25))
+
+        # Draw player lanes
         for lane in self.player_lanes:
             lane.draw(screen, font, small_font)
-    
+
     def draw_visual_map(self, screen, font, small_font):
-        """Draw the visual representation of all cards as sprites in battle zone with rows"""
         lane_width = self.visual_map_rect.width // 4
-        
-        # Calculate row heights (3 rows: landscape, building, creature)
-        row_height = self.visual_map_rect.height // 6  # 3 rows for opponent, 3 for player
-        
-        # Draw grid lines for rows
+        row_height = self.visual_map_rect.height // 6
+
+        # Grid lines
         for i in range(1, 6):
             y = self.visual_map_rect.y + i * row_height
             pygame.draw.line(screen, (80, 80, 80),
-                           (self.visual_map_rect.x, y),
-                           (self.visual_map_rect.right, y), 1)
-        
-        # Draw column lines for lanes
+                             (self.visual_map_rect.x, y),
+                             (self.visual_map_rect.right, y), 1)
+
         for i in range(1, 4):
             x = self.visual_map_rect.x + i * lane_width
             pygame.draw.line(screen, (80, 80, 80),
-                           (x, self.visual_map_rect.y),
-                           (x, self.visual_map_rect.bottom), 1)
-        
-        # Draw opponent's cards (top 3 rows)
+                             (x, self.visual_map_rect.y),
+                             (x, self.visual_map_rect.bottom), 1)
+
+        # Opponent cards
         for i, lane in enumerate(self.opponent_lanes):
             lane_x = self.visual_map_rect.x + i * lane_width
-            
-            # Landscape row (top)
-            landscape_area = pygame.Rect(
-                lane_x + 5,
-                self.visual_map_rect.y + 5,
-                lane_width - 10,
-                row_height - 10
-            )
-            
-            # Building row (middle)
-            building_area = pygame.Rect(
-                lane_x + lane_width//2 - 35,
-                self.visual_map_rect.y + row_height + 5,
-                70, 55
-            )
-            
-            # Creature row (bottom of opponent section)
-            creature_area = pygame.Rect(
-                lane_x + lane_width//2 - 45,
-                self.visual_map_rect.y + 2 * row_height + 10,
-                90, 80
-            )
-            
+            landscape_area = pygame.Rect(lane_x + 5, self.visual_map_rect.y + 5,
+                                         lane_width - 10, row_height - 10)
+            building_area = pygame.Rect(lane_x + lane_width // 2 - 30,
+                                        self.visual_map_rect.y + row_height + 5, 60, 45)
+            creature_area = pygame.Rect(lane_x + lane_width // 2 - 40,
+                                        self.visual_map_rect.y + 2 * row_height + 10, 80, 70)
+
             if lane.landscape_card:
                 lane.landscape_card.draw_on_map(screen, landscape_area)
             if lane.building_card:
                 lane.building_card.draw_on_map(screen, building_area)
             if lane.creature_card:
                 lane.creature_card.draw_on_map(screen, creature_area)
-        
-        # Draw center divider line (thicker)
+
+        # Divider line
         center_y = self.visual_map_rect.y + 3 * row_height
         pygame.draw.line(screen, WHITE,
-                        (self.visual_map_rect.x, center_y),
-                        (self.visual_map_rect.right, center_y), 4)
-        
-        # Draw player's cards (bottom 3 rows)
+                         (self.visual_map_rect.x, center_y),
+                         (self.visual_map_rect.right, center_y), 3)
+
+        # Player cards
         for i, lane in enumerate(self.player_lanes):
             lane_x = self.visual_map_rect.x + i * lane_width
-            
-            # Creature row (top of player section)
-            creature_area = pygame.Rect(
-                lane_x + lane_width//2 - 45,
-                self.visual_map_rect.y + 3 * row_height + 10,
-                90, 80
-            )
-            
-            # Building row (middle)
-            building_area = pygame.Rect(
-                lane_x + lane_width//2 - 35,
-                self.visual_map_rect.y + 4 * row_height + 5,
-                70, 55
-            )
-            
-            # Landscape row (bottom)
-            landscape_area = pygame.Rect(
-                lane_x + 5,
-                self.visual_map_rect.y + 5 * row_height + 5,
-                lane_width - 10,
-                row_height - 10
-            )
-            
+            creature_area = pygame.Rect(lane_x + lane_width // 2 - 40,
+                                        self.visual_map_rect.y + 3 * row_height + 10, 80, 70)
+            building_area = pygame.Rect(lane_x + lane_width // 2 - 30,
+                                        self.visual_map_rect.y + 4 * row_height + 5, 60, 45)
+            landscape_area = pygame.Rect(lane_x + 5,
+                                         self.visual_map_rect.y + 5 * row_height + 5,
+                                         lane_width - 10, row_height - 10)
+
             if lane.creature_card:
                 lane.creature_card.draw_on_map(screen, creature_area)
             if lane.building_card:
                 lane.building_card.draw_on_map(screen, building_area)
             if lane.landscape_card:
                 lane.landscape_card.draw_on_map(screen, landscape_area)
-    
+
     def get_lane_at_position(self, pos, is_player):
-        """Get the lane at a given position"""
         lanes = self.player_lanes if is_player else self.opponent_lanes
         for lane in lanes:
             if lane.rect.collidepoint(pos):
@@ -494,7 +456,7 @@ class CardWarsGame:
         self.opponent = Player("Jake")
         
         # Hand area - adjusted for smaller board
-        self.hand_rect = pygame.Rect(350, SCREEN_HEIGHT - 400, SCREEN_WIDTH - 500, 180)
+        self.hand_rect = pygame.Rect(400, SCREEN_HEIGHT - 300, SCREEN_WIDTH - 500, 150)
         
         # Game state
         self.dragged_card = None
