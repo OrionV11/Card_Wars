@@ -27,6 +27,17 @@ BLUE = (30, 144, 255)
 PURPLE = (147, 112, 219)
 GREEN = (34, 139, 34)
 
+try:
+    with open('./data.json', 'r', encoding='utf') as f:
+        cards_data = json.load(f)
+
+except Exception as e:
+    print(f"Error loading data: {e}")
+    with open('./data.json', 'r', encoding='utf-8-sig') as f:
+        cards_data = json.load(f)
+
+
+
 # Card class
 class Card:
     def __init__(self, name, landscape, ability, cost):
@@ -56,6 +67,53 @@ class Landscape:
 class Hero(Card):
     def __init__(self, name, ability):
         super().__init__(name, None, ability, None)
+
+
+creatures = cards_data.get('Creature', [])
+creature_objects = []
+for creature_data in creatures:
+    creature = Creature(
+        name=creature_data['name'],
+        landscape=creature_data['landscape'],
+        ability=creature_data['ability'],
+        cost=creature_data['cost'],
+        attack=creature_data['attack'],
+        defense=creature_data['defense']
+        )
+    creature_objects.append(creature)
+
+creature_deck = {
+    'Creatures' : creature_objects 
+    }
+
+landscapes = cards_data.get('Landscape', [])
+
+landscape_objects = []
+for landscape_data in landscapes:
+    landscape = Landscape(
+        name=landscape_data['name'],
+    )
+    landscape_objects.append(landscape)
+
+landscape_deck = {
+    'Landscape': landscape_objects
+}
+
+buildings = cards_data.get('Building', [])
+building_objects = []
+for building_data in buildings:
+    building = Building(
+        name=building_data['name'],
+        landscape=building_data['landscape'],
+        ability=building_data['ability'],
+        cost=building_data['cost'],
+        )
+    building_objects.append(building)
+
+building_deck = {
+    'Building': building_objects
+}
+
 
 # Visual Card class for rendering
 class VisualCard:
@@ -285,6 +343,20 @@ class Lane:
             return True
         return False
 
+def draw_random_card(card_deck):
+        non_empty_types = [key for key, value in card_deck.items() if value]
+
+        if not non_empty_types:
+            return None, None  # No cards left to draw
+
+        random_card_type = random.choice(non_empty_types)
+        chosen_card_list = card_deck[random_card_type]
+        random_card = random.choice(chosen_card_list)
+        chosen_card_list.remove(random_card)
+        
+
+        return random_card_type, random_card
+
 class Board:
     def __init__(self):
         # Smaller play area so it fits on screen
@@ -407,7 +479,6 @@ class Board:
             landscape_area = pygame.Rect(lane_x + 5,
                                          self.visual_map_rect.y + 5 * row_height + 5,
                                          lane_width - 10, row_height - 10)
-
             if lane.creature_card:
                 lane.creature_card.draw_on_map(screen, creature_area)
             if lane.building_card:
@@ -428,10 +499,31 @@ class Player:
         self.health = 25
         self.actions = 2
         self.hand = []  # List of VisualCard objects
-        
+
+    
+    def drawing(self, deck, hand_area_rect, num_cap):
+        num = 0
+        while num < num_cap:
+            card_type, card = draw_random_card(deck)
+            if card:
+                temp = card.name.split(' ')[3:]
+                temp_join = ' '.join(temp)
+                card.name = temp_join
+
+                card_spacing = 110
+                x = hand_area_rect.x + 10 + len(self.hand) * card_spacing
+                y = hand_area_rect.y + 10
+
+                visual_card = VisualCard(card, x, y)
+                self.hand.append(visual_card)
+                num += 1
+            else:
+                print("NO Cards you need to debug because that shouldnt make sense")
+
     def draw_card(self, card_data, hand_area_rect):
         """Add a card to the player's hand"""
         # Calculate position in hand
+
         card_spacing = 110
         x = hand_area_rect.x + 10 + len(self.hand) * card_spacing
         y = hand_area_rect.y + 10
@@ -439,6 +531,10 @@ class Player:
         visual_card = VisualCard(card_data, x, y)
         self.hand.append(visual_card)
         return visual_card
+
+
+
+Finn = Player("Finn")
 
 class CardWarsGame:
     def __init__(self):
@@ -464,18 +560,24 @@ class CardWarsGame:
         
         # Initialize with test cards (you'll load from your data.json)
         self.init_test_cards()
+
+    def drawing_start(self):
+        Finn.drawing(landscape_deck, self.hand_rect, num_cap=4)
+        Finn.drawing(creature_deck, self.hand_rect, num_cap=5)
+        Finn.drawing(building_deck,self.hand_rect, num_cap=4)
+        #Finn.draw_card()
+
         
     def init_test_cards(self):
         """Initialize with some test cards - replace with your data loading"""
         # Create some test creatures
-        test_creature1 = Creature("Corn Dog", "Cornfield", 2, 3, 2, "Test ability")
-        test_creature2 = Creature("Sand Angel", "SandyLands", 3, 4, 3, "Test ability")
-        test_landscape = Landscape("Blue Plains")
+        #test_landscape = Landscape("Blue Plains")
         
         # Add to player hand
-        self.player.draw_card(test_creature1, self.hand_rect)
-        self.player.draw_card(test_creature2, self.hand_rect)
-        self.player.draw_card(test_landscape, self.hand_rect)
+        self.player.drawing(landscape_deck, self.hand_rect, num_cap=4)
+        self.player.drawing(creature_deck, self.hand_rect, num_cap=5)
+        self.player.drawing(building_deck, self.hand_rect, num_cap=4)
+        #self.player.draw_card(test_landscape, self.hand_rect)
     
     def draw_ui(self):
         # Title
