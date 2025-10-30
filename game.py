@@ -118,12 +118,17 @@ building_deck = {
 # Visual Card class for rendering
 class VisualCard:
     def __init__(self, card_data, x, y, width=70, height=100):
-        self.card = card_data  # The actual card object (Creature, Spell, etc.)
+        self.card = card_data
         self.rect = pygame.Rect(x, y, width, height)
         self.dragging = False
         self.offset_x = 0
         self.offset_y = 0
-        self.sprite = None  # For future sprite loading
+        self.sprite = None
+        
+        # NEW: Battle zone attributes
+        self.battle_zone_pos = None  # (row, col)
+        self.can_move = False
+        self.has_attacked = False
         
     def draw(self, screen, font, small_font):
         # Card background
@@ -243,69 +248,82 @@ class Lane:
         self.color = color
         self.lane_number = lane_number
         
-        # Card slot dimensions - reduced size
+        # Card slot dimensions
         self.slot_height = (height - 50) // 3
         self.slot_margin = 5
         
-        # Three rows: Landscape, Building, Creature
+        # Three rows: Landscape, Building, Creatures
         self.landscape_slot = pygame.Rect(x + 5, y + 30, width - 10, self.slot_height)
         self.building_slot = pygame.Rect(x + 5, y + 30 + self.slot_height + self.slot_margin, 
                                          width - 10, self.slot_height)
         self.creature_slot = pygame.Rect(x + 5, y + 30 + 2 * (self.slot_height + self.slot_margin), 
                                         width - 10, self.slot_height)
         
-        # Card holders - store VisualCard objects
+        # Card holders
         self.landscape_card = None
         self.building_card = None
-        self.creature_card = None
+        self.creatures = []  # Changed to list!
+        self.max_creatures = 3
+        
         
     def draw(self, screen, font, small_font):
-        # Draw lane background
+    # Draw lane background
         pygame.draw.rect(screen, self.color, self.rect)
         pygame.draw.rect(screen, BLACK, self.rect, 3)
-        
+    
         # Draw lane number
         lane_text = small_font.render(f"Lane {self.lane_number}", True, BLACK)
         lane_rect = lane_text.get_rect(center=(self.rect.centerx, self.rect.y + 15))
         screen.blit(lane_text, lane_rect)
-        
+    
         # Draw landscape slot
         pygame.draw.rect(screen, LIGHT_GRAY, self.landscape_slot)
         pygame.draw.rect(screen, BLACK, self.landscape_slot, 2)
         if not self.landscape_card:
             land_label = pygame.font.Font(None, 14).render("Landscape", True, BLACK)
             screen.blit(land_label, (self.landscape_slot.x + 3, self.landscape_slot.y + 3))
-        
+    
         # Draw building slot
         pygame.draw.rect(screen, LIGHT_GRAY, self.building_slot)
         pygame.draw.rect(screen, BLACK, self.building_slot, 2)
         if not self.building_card:
             build_label = pygame.font.Font(None, 14).render("Building", True, BLACK)
             screen.blit(build_label, (self.building_slot.x + 3, self.building_slot.y + 3))
-        
-        # Draw creature slot
+    
+        # Draw creature slot with counter (CHANGED: use self.creatures instead of self.creature_card)
         pygame.draw.rect(screen, LIGHT_GRAY, self.creature_slot)
         pygame.draw.rect(screen, BLACK, self.creature_slot, 2)
-        if not self.creature_card:
-            creature_label = pygame.font.Font(None, 14).render("Creature", True, BLACK)
+        if not self.creatures:  # Changed from self.creature_card
+            creature_label = pygame.font.Font(None, 14).render("Creatures", True, BLACK)
             screen.blit(creature_label, (self.creature_slot.x + 3, self.creature_slot.y + 3))
-        
-        # Draw cards in slots (smaller)
+        else:
+            # Show creature count
+            count_text = small_font.render(f"{len(self.creatures)}/{self.max_creatures}", True, BLACK)
+            screen.blit(count_text, (self.creature_slot.x + 5, self.creature_slot.y + 5))
+    
+        # Draw cards in slots
         if self.landscape_card:
             self.landscape_card.rect.center = self.landscape_slot.center
             self.landscape_card.rect.width = 60
             self.landscape_card.rect.height = self.slot_height - 10
             self.landscape_card.draw(screen, font, small_font)
+        
         if self.building_card:
             self.building_card.rect.center = self.building_slot.center
             self.building_card.rect.width = 60
             self.building_card.rect.height = self.slot_height - 10
             self.building_card.draw(screen, font, small_font)
-        if self.creature_card:
-            self.creature_card.rect.center = self.creature_slot.center
-            self.creature_card.rect.width = 60
-            self.creature_card.rect.height = self.slot_height - 10
-            self.creature_card.draw(screen, font, small_font)
+        
+        # Draw creatures side by side in slot (CHANGED: iterate through list)
+        if self.creatures:
+            creature_spacing = 65
+            start_x = self.creature_slot.x + 5
+            for i, creature in enumerate(self.creatures):
+                creature.rect.x = start_x + i * creature_spacing
+                creature.rect.y = self.creature_slot.y + 5
+                creature.rect.width = 60
+                creature.rect.height = self.slot_height - 10
+                creature.draw(screen, font, small_font)
     
     def draw_visual_map(self, screen, font, small_font):
         """Draw a simplified visual representation of cards as sprites"""
@@ -324,9 +342,9 @@ class Lane:
         elif isinstance(card, Building):
             return self.building_card is None
         elif isinstance(card, Creature):
-            return self.creature_card is None
+            return len(self.creatures) < self.max_creatures  # Changed
         return False
-    
+
     def place_card(self, visual_card):
         """Place a card in the appropriate slot"""
         if isinstance(visual_card.card, Landscape) and self.landscape_card is None:
@@ -337,9 +355,8 @@ class Lane:
             self.building_card = visual_card
             visual_card.rect.center = self.building_slot.center
             return True
-        elif isinstance(visual_card.card, Creature) and self.creature_card is None:
-            self.creature_card = visual_card
-            visual_card.rect.center = self.creature_slot.center
+        elif isinstance(visual_card.card, Creature) and len(self.creatures) < self.max_creatures:  # Changed
+            self.creatures.append(visual_card)  # Changed
             return True
         return False
 
@@ -360,7 +377,7 @@ def draw_random_card(card_deck):
 class Board:
     def __init__(self):
         # Smaller play area so it fits on screen
-        screen_play_area = SCREEN_HEIGHT - 480  # reduced from -300
+        screen_play_area = SCREEN_HEIGHT - 480
 
         # Adjusted proportions
         opponent_lane_height = int(screen_play_area * 0.20)
@@ -403,6 +420,74 @@ class Board:
             lane = Lane(x, y, lane_width, player_lane_height, lane_colors[i], i + 1)
             self.player_lanes.append(lane)
 
+        # NEW: Battle zone grid system
+        self.battle_rows = 6  # 3 for each player
+        self.battle_cols = 4  # One per lane
+        
+        # Store creatures in battle zone: [row][col] = list of creatures
+        self.battle_grid = [[[] for _ in range(self.battle_cols)] for _ in range(self.battle_rows)]
+
+    def get_battle_cell_rect(self, row, col):
+        """Get the rectangle for a specific battle zone cell"""
+        lane_width = self.visual_map_rect.width // 4
+        row_height = self.visual_map_rect.height // 6
+        
+        x = self.visual_map_rect.x + col * lane_width
+        y = self.visual_map_rect.y + row * row_height
+        
+        return pygame.Rect(x, y, lane_width, row_height)
+    
+    def can_move_creature(self, creature_card, from_row, from_col, to_row, to_col):
+        """Check if a creature can move to a position"""
+        # Basic movement rules
+        if to_row < 0 or to_row >= self.battle_rows:
+            return False
+        if to_col < 0 or to_col >= self.battle_cols:
+            return False
+            
+        # Can only move forward/backward one row or stay in same row
+        if abs(to_row - from_row) > 1:
+            return False
+            
+        # Cannot move to occupied space (or allow stacking with limit)
+        target_cell = self.battle_grid[to_row][to_col]
+        if len(target_cell) >= 3:  # Max 3 creatures per cell
+            return False
+            
+        return True
+    
+    def move_creature(self, creature_card, from_row, from_col, to_row, to_col):
+        """Move a creature in the battle zone"""
+        if not self.can_move_creature(creature_card, from_row, from_col, to_row, to_col):
+            return False
+            
+        # Remove from old position
+        if creature_card in self.battle_grid[from_row][from_col]:
+            self.battle_grid[from_row][from_col].remove(creature_card)
+        
+        # Add to new position
+        self.battle_grid[to_row][to_col].append(creature_card)
+        creature_card.battle_zone_pos = (to_row, to_col)
+        creature_card.can_move = False
+        
+        return True
+    
+    def get_battle_cell_at_position(self, pos):
+        """Get the battle zone cell (row, col) at a mouse position"""
+        if not self.visual_map_rect.collidepoint(pos):
+            return None
+            
+        rel_x = pos[0] - self.visual_map_rect.x
+        rel_y = pos[1] - self.visual_map_rect.y
+        
+        lane_width = self.visual_map_rect.width // 4
+        row_height = self.visual_map_rect.height // 6
+        
+        col = min(rel_x // lane_width, 3)
+        row = min(rel_y // row_height, 5)
+        
+        return (row, col)
+
     def draw(self, screen, font, small_font):
         # Opponent label
         opponent_label = font.render("OPPONENT", True, WHITE)
@@ -430,6 +515,7 @@ class Board:
             lane.draw(screen, font, small_font)
 
     def draw_visual_map(self, screen, font, small_font):
+        """Enhanced battle zone drawing with grid and creatures"""
         lane_width = self.visual_map_rect.width // 4
         row_height = self.visual_map_rect.height // 6
 
@@ -446,22 +532,35 @@ class Board:
                              (x, self.visual_map_rect.y),
                              (x, self.visual_map_rect.bottom), 1)
 
-        # Opponent cards
+        # Draw landscape backgrounds for each lane
         for i, lane in enumerate(self.opponent_lanes):
             lane_x = self.visual_map_rect.x + i * lane_width
             landscape_area = pygame.Rect(lane_x + 5, self.visual_map_rect.y + 5,
                                          lane_width - 10, row_height - 10)
-            building_area = pygame.Rect(lane_x + lane_width // 2 - 30,
-                                        self.visual_map_rect.y + row_height + 5, 60, 45)
-            creature_area = pygame.Rect(lane_x + lane_width // 2 - 40,
-                                        self.visual_map_rect.y + 2 * row_height + 10, 80, 70)
-
             if lane.landscape_card:
                 lane.landscape_card.draw_on_map(screen, landscape_area)
+
+        # Draw buildings (fixed positions)
+        for i, lane in enumerate(self.opponent_lanes):
+            lane_x = self.visual_map_rect.x + i * lane_width
+            building_area = pygame.Rect(lane_x + lane_width // 2 - 30,
+                                        self.visual_map_rect.y + row_height + 5, 60, 45)
             if lane.building_card:
                 lane.building_card.draw_on_map(screen, building_area)
-            if lane.creature_card:
-                lane.creature_card.draw_on_map(screen, creature_area)
+
+        # NEW: Draw all creatures from battle grid
+        for row in range(self.battle_rows):
+            for col in range(self.battle_cols):
+                creatures_in_cell = self.battle_grid[row][col]
+                cell_rect = self.get_battle_cell_rect(row, col)
+                
+                # Draw each creature in the cell
+                for idx, creature in enumerate(creatures_in_cell):
+                    # Offset creatures slightly if multiple in same cell
+                    offset_x = (idx - len(creatures_in_cell)//2) * 30
+                    creature_rect = cell_rect.copy()
+                    creature_rect.x += offset_x
+                    creature.draw_on_map(screen, creature_rect)
 
         # Divider line
         center_y = self.visual_map_rect.y + 3 * row_height
@@ -469,18 +568,14 @@ class Board:
                          (self.visual_map_rect.x, center_y),
                          (self.visual_map_rect.right, center_y), 3)
 
-        # Player cards
+        # Draw player landscapes and buildings
         for i, lane in enumerate(self.player_lanes):
             lane_x = self.visual_map_rect.x + i * lane_width
-            creature_area = pygame.Rect(lane_x + lane_width // 2 - 40,
-                                        self.visual_map_rect.y + 3 * row_height + 10, 80, 70)
             building_area = pygame.Rect(lane_x + lane_width // 2 - 30,
                                         self.visual_map_rect.y + 4 * row_height + 5, 60, 45)
             landscape_area = pygame.Rect(lane_x + 5,
                                          self.visual_map_rect.y + 5 * row_height + 5,
                                          lane_width - 10, row_height - 10)
-            if lane.creature_card:
-                lane.creature_card.draw_on_map(screen, creature_area)
             if lane.building_card:
                 lane.building_card.draw_on_map(screen, building_area)
             if lane.landscape_card:
@@ -546,6 +641,10 @@ class CardWarsGame:
         self.title_font = pygame.font.Font(None, 48)
         
         self.board = Board()
+
+        #
+        self.selected_creature = None
+        self.selected_creature_pos = None
         
         # Players
         self.player = Player("Finn")
@@ -616,6 +715,18 @@ class CardWarsGame:
         mouse_pos = pygame.mouse.get_pos()
         
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            battle_cell = self.board.get_battle_cell_at_position(mouse_pos)
+            if battle_cell:
+                row, col = battle_cell
+                creatures = self.board.battle_grid[row][col]
+                if creatures:
+                    for creature in creatures:
+                        if creature.can_move:
+                            self.selected_creature = creature
+                            self.selected_creature_pos = (row, col)
+                            return             
+            
+
             # Check if clicking on a card in hand
             for card in self.player.hand:
                 if card.rect.collidepoint(mouse_pos):
@@ -625,21 +736,41 @@ class CardWarsGame:
                     card.offset_y = card.rect.y - mouse_pos[1]
                     break
         
-        elif event.type == pygame.MOUSEMOTION and self.dragged_card:
-            # Update dragged card position
-            self.dragged_card.rect.x = mouse_pos[0] + self.dragged_card.offset_x
-            self.dragged_card.rect.y = mouse_pos[1] + self.dragged_card.offset_y
+        elif event.type == pygame.MOUSEMOTION:
+            if self.dragged_card:
+                # Update dragged card position
+                self.dragged_card.rect.x = mouse_pos[0] + self.dragged_card.offset_x
+                self.dragged_card.rect.y = mouse_pos[1] + self.dragged_card.offset_y
         
-        elif event.type == pygame.MOUSEBUTTONUP and event.button == 1 and self.dragged_card:
-            # Try to place card on board
-            placed = False
-            lane = self.board.get_lane_at_position(mouse_pos, True)
-            
-            if lane and lane.can_place_card(self.dragged_card.card):
-                if lane.place_card(self.dragged_card):
-                    self.player.hand.remove(self.dragged_card)
-                    self.player.actions -= 1
-                    placed = True
+        elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+            if self.selected_creature:
+                battle_cell = self.board.get_battle_cell_at_position(mouse_pos)
+                if battle_cell:
+                    to_row, to_col = battle_cell
+                    from_row, from_col = self.selected_creature_pos
+                    self.board.move_creature(self.selected_creature, from_row, from_col, to_row, to_col)
+                
+                self.selected_creature = None
+                self.selected_creature_pos = None
+                return
+
+            if self.dragged_card:
+                placed = False
+                lane = self.board.get_lane_at_position(mouse_pos, True)
+
+                if lane and lane.can_place_card(self.dragged_card.card):
+                    if lane.place_card(self.dragged_card):
+                        self.player.hand.remove(self.dragged_card)
+                    
+                        if isinstance(self.dragged_card.card, Creature):
+                            lane_idx = self.board.player_lanes.index(lane)
+                            start_row = 3
+                            self.board.battle_grid[start_row][lane_idx].append(self.dragged_card)
+                            self.dragged_card.battle_zone_pos = (start_row, lane_idx)
+                            self.dragged_card.can_move = True
+                      
+                        self.player.actions -= 1
+                        placed = True
             
             # Return to hand if not placed
             if not placed and self.dragged_from_hand:
